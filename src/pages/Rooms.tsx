@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { 
   Lock, MessageSquare, Plus, RefreshCw, Search, Users, Gamepad2, Clock, ArrowRight 
@@ -632,11 +631,6 @@ const Rooms = () => {
                           room.players >= room.maxPlayers / 2 ? "bg-neon-yellow/20" :
                           "bg-neon-green/20"
                         }`}
-                        indicatorClassName={
-                          room.players >= room.maxPlayers ? "bg-neon-red" :
-                          room.players >= room.maxPlayers / 2 ? "bg-neon-yellow" :
-                          "bg-neon-green"
-                        }
                       />
                       
                       <div className="grid grid-cols-2 gap-4 mt-4">

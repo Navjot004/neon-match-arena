@@ -1,6 +1,5 @@
-
 import { Link } from "react-router-dom";
-import { Github, Twitter, Discord, Heart } from "lucide-react";
+import { Github, Twitter, MessagesSquare, Heart } from "lucide-react";
 
 const Footer = () => {
   return (
@@ -26,7 +25,7 @@ const Footer = () => {
                 <Twitter className="h-5 w-5" />
               </a>
               <a href="#" className="text-gray-400 hover:text-neon-purple transition-colors">
-                <Discord className="h-5 w-5" />
+                <MessagesSquare className="h-5 w-5" />
               </a>
             </div>
           </div>
