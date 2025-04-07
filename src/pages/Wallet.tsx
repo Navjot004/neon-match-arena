@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { 
-  Wallet, ArrowRightLeft, Plus, Clock, Download, Upload, Eye, Copy, ExternalLink 
+  WalletIcon, ArrowRightLeft, Plus, Clock, Download, Upload, Eye, Copy, ExternalLink 
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import { toast } from "@/components/ui/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
-const Wallet = () => {
+const WalletPage = () => {
   const [balance, setBalance] = useState("0.0384");
   const [address, setAddress] = useState("0x7a95AA9647531F3393CDCA212A12764D");
   const [sendAmount, setSendAmount] = useState("");
@@ -102,14 +102,14 @@ const Wallet = () => {
               <Card className="glass-panel h-full">
                 <CardHeader className="border-b border-white/10 pb-6">
                   <CardTitle className="flex items-center gap-2">
-                    <Wallet className="h-5 w-5 text-neon-blue" />
+                    <WalletIcon className="h-5 w-5 text-neon-blue" />
                     Crypto Wallet
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-center space-y-4 mb-6">
                     <div className="w-20 h-20 rounded-full bg-gradient-to-r from-neon-blue to-neon-purple flex items-center justify-center">
-                      <Wallet className="h-10 w-10 text-white" />
+                      <WalletIcon className="h-10 w-10 text-white" />
                     </div>
                     <div className="text-center">
                       <div className="text-3xl font-bold mb-1">{balance} ETH</div>
@@ -316,4 +316,5 @@ const Wallet = () => {
   );
 };
 
-export default Wallet;
+export default WalletPage;
+
