@@ -21,98 +21,148 @@ import { toast } from "@/components/ui/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import TransactionItem from "@/components/TransactionItem";
-import { useBlockchain } from "@/contexts/BlockchainContext";
-import { Transaction, networks } from "@/types/blockchain";
+import { createWallet, getBalance, transferFunds, getTransactions, Transaction as ApiTransaction } from "@/services/walletApi";
+import { Transaction } from "@/types/blockchain";
 
 const WalletPage = () => {
-  const { 
-    accounts,
-    balance, 
-    isConnected, 
-    isLoading, 
-    connectWallet, 
-    disconnectWallet,
-    sendTransaction,
-    refreshBalance,
-    web3
-  } = useBlockchain();
-  
+  const [walletId, setWalletId] = useState<string | null>(null);
+  const [username, setUsername] = useState("player1");
+  const [balance, setBalance] = useState("0");
+  const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [sendAmount, setSendAmount] = useState("");
-  const [sendAddress, setSendAddress] = useState("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transactionFilter, setTransactionFilter] = useState("all");
-  const [currentNetwork, setCurrentNetwork] = useState<number>(1);
-  const [usdValue, setUsdValue] = useState("0.00");
 
-  // Get current network and set it
   useEffect(() => {
-    const checkNetwork = async () => {
-      if (web3 && window.ethereum) {
-        try {
-          const chainId = await web3.eth.getChainId();
-          setCurrentNetwork(chainId);
-        } catch (error) {
-          console.error("Error getting chain ID:", error);
-        }
-      }
-    };
-    
-    checkNetwork();
-  }, [web3, isConnected]);
-
-  // Fetch USD value
-  useEffect(() => {
-    const fetchUsdValue = async () => {
-      if (!balance || parseFloat(balance) === 0) {
-        setUsdValue("0.00");
-        return;
-      }
-      
-      try {
-        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
-        const data = await response.json();
-        const ethPrice = data.ethereum.usd;
-        const usdAmount = (parseFloat(balance) * ethPrice).toFixed(2);
-        setUsdValue(usdAmount);
-      } catch (error) {
-        console.error("Error fetching ETH price:", error);
-        // Use a fallback value
-        const estimatedPrice = 2500;
-        setUsdValue((parseFloat(balance) * estimatedPrice).toFixed(2));
-      }
-    };
-    
-    if (isConnected) {
-      fetchUsdValue();
+    // Check if wallet already exists in localStorage
+    const savedWalletId = localStorage.getItem("walletId");
+    if (savedWalletId) {
+      setWalletId(savedWalletId);
+      setIsConnected(true);
+      refreshBalance(savedWalletId);
+      loadTransactions(savedWalletId);
     }
-  }, [balance, isConnected]);
+  }, []);
+
+  const connectWallet = async () => {
+    setIsLoading(true);
+    try {
+      const response = await createWallet(username);
+      setWalletId(response.wallet_id);
+      setBalance(response.balance.toString());
+      setIsConnected(true);
+      
+      // Save to localStorage
+      localStorage.setItem("walletId", response.wallet_id);
+      
+      toast({
+        title: "Wallet connected",
+        description: "Your wallet has been created successfully",
+      });
+    } catch (error: any) {
+      console.error("Error creating wallet:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to create wallet",
+        description: error.message || "An unknown error occurred",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const disconnectWallet = () => {
+    setWalletId(null);
+    setBalance("0");
+    setIsConnected(false);
+    setTransactions([]);
+    
+    // Remove from localStorage
+    localStorage.removeItem("walletId");
+    
+    toast({
+      title: "Wallet disconnected",
+      description: "Your wallet has been disconnected",
+    });
+  };
+
+  const refreshBalance = async (id: string | null = walletId) => {
+    if (!id) return;
+    
+    try {
+      const newBalance = await getBalance(id);
+      setBalance(newBalance.toString());
+    } catch (error) {
+      console.error("Error refreshing balance:", error);
+    }
+  };
+
+  const loadTransactions = async (id: string | null = walletId) => {
+    if (!id) return;
+    
+    try {
+      const apiTransactions = await getTransactions(id);
+      
+      // Convert API transactions to our internal format
+      const formattedTransactions: Transaction[] = apiTransactions.map((tx: ApiTransaction) => ({
+        id: tx.id,
+        type: tx.type === 'credit' ? 'receive' : 'send',
+        amount: tx.amount.toString(),
+        address: 'Internal Transfer',
+        timestamp: new Date(tx.timestamp * 1000).toLocaleString(),
+        hash: tx.id
+      }));
+      
+      setTransactions(formattedTransactions);
+    } catch (error) {
+      console.error("Error loading transactions:", error);
+    }
+  };
 
   const handleSendTransaction = async () => {
-    if (!sendAmount || !sendAddress) {
+    if (!walletId || !sendAmount || parseFloat(sendAmount) <= 0) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please enter both amount and address",
+        description: "Please enter a valid amount",
       });
       return;
     }
 
-    const success = await sendTransaction(sendAddress, sendAmount);
-    
-    if (success) {
+    setIsLoading(true);
+    try {
+      const result = await transferFunds(walletId, parseFloat(sendAmount));
+      
+      // Update balance
+      setBalance(result.new_balance.toString());
+      
       // Add to local transaction history
       const newTx: Transaction = {
-        id: `tx-${Date.now()}`,
+        id: result.txn.id,
         type: 'send',
-        amount: sendAmount,
-        address: sendAddress,
-        timestamp: 'Just now',
-        hash: 'pending' // This would be updated with real hash in a production app
+        amount: result.txn.amount.toString(),
+        address: 'Internal Transfer',
+        timestamp: new Date(result.txn.timestamp * 1000).toLocaleString(),
+        hash: result.txn.id
       };
       
       setTransactions(prev => [newTx, ...prev]);
       setSendAmount("");
-      setSendAddress("");
+      
+      toast({
+        title: "Transfer successful",
+        description: `You've transferred ${result.txn.amount} coins`,
+      });
+    } catch (error: any) {
+      console.error("Error sending transaction:", error);
+      toast({
+        variant: "destructive",
+        title: "Transaction failed",
+        description: error.response?.data?.error || "Failed to send transaction",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -120,18 +170,14 @@ const WalletPage = () => {
     navigator.clipboard.writeText(text);
     toast({
       title: "Copied to clipboard",
-      description: "Wallet address copied to clipboard",
+      description: "Wallet ID copied to clipboard",
     });
   };
 
-  const currentAddress = accounts.length > 0 ? accounts[0] : '';
-  
   const filteredTransactions = transactions.filter(tx => {
     if (transactionFilter === "all") return true;
     return tx.type === transactionFilter;
   });
-  
-  const networkData = networks[currentNetwork] || networks[1];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -145,21 +191,26 @@ const WalletPage = () => {
                 <div className="flex flex-col items-center space-y-6">
                   <WalletIcon className="h-20 w-20 text-neon-blue" />
                   <div className="text-center space-y-2">
-                    <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
+                    <h2 className="text-2xl font-bold">Create Your Wallet</h2>
                     <p className="text-gray-400">
-                      Connect your Ethereum wallet to access blockchain features
+                      Create your game wallet to manage your in-game currency
                     </p>
+                  </div>
+                  <div className="w-full max-w-xs">
+                    <Input
+                      placeholder="Enter username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="mb-4"
+                    />
                   </div>
                   <Button 
                     className="bg-neon-blue hover:bg-neon-blue/90 text-lg px-8 py-6" 
                     onClick={connectWallet}
                     disabled={isLoading}
                   >
-                    {isLoading ? "Connecting..." : "Connect Wallet"}
+                    {isLoading ? "Creating..." : "Create Wallet"}
                   </Button>
-                  <div className="text-sm text-gray-400">
-                    Make sure you have MetaMask or another Ethereum wallet installed
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -172,9 +223,9 @@ const WalletPage = () => {
                     <div className="flex justify-between items-center">
                       <CardTitle className="flex items-center gap-2">
                         <WalletIcon className="h-5 w-5 text-neon-blue" />
-                        {networkData.name}
+                        Game Wallet
                       </CardTitle>
-                      <Badge variant="outline">{networkData.symbol}</Badge>
+                      <Badge variant="outline">RMCoins</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-6">
@@ -183,13 +234,15 @@ const WalletPage = () => {
                         <WalletIcon className="h-10 w-10 text-white" />
                       </div>
                       <div className="text-center">
-                        <div className="text-3xl font-bold mb-1">{balance} {networkData.symbol}</div>
-                        <div className="text-sm text-gray-400">≈ ${usdValue} USD</div>
+                        <div className="text-3xl font-bold mb-1">{balance} RMCoins</div>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="mt-2"
-                          onClick={refreshBalance}
+                          onClick={() => {
+                            refreshBalance();
+                            loadTransactions();
+                          }}
                         >
                           <RefreshCw className="h-3 w-3 mr-1" /> Refresh
                         </Button>
@@ -198,14 +251,14 @@ const WalletPage = () => {
                     
                     <div className="space-y-4">
                       <div className="p-3 rounded-md bg-white/5 flex items-center justify-between">
-                        <div className="text-sm text-gray-400">Wallet Address</div>
+                        <div className="text-sm text-gray-400">Wallet ID</div>
                         <div className="flex items-center gap-2">
-                          <code className="text-xs">{currentAddress.substring(0, 10)}...{currentAddress.substring(currentAddress.length - 4)}</code>
+                          <code className="text-xs">{walletId?.substring(0, 10)}...</code>
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             className="h-6 w-6" 
-                            onClick={() => copyToClipboard(currentAddress)}
+                            onClick={() => copyToClipboard(walletId || '')}
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
@@ -215,29 +268,21 @@ const WalletPage = () => {
                       <div className="grid grid-cols-2 gap-4">
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button className="w-full bg-neon-blue hover:bg-neon-blue/90">
+                            <Button className="w-full bg-neon-purple hover:bg-neon-purple/90">
                               <Upload className="h-4 w-4 mr-2" />
-                              Send
+                              Transfer
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="glass-panel border-white/10">
                             <DialogHeader>
-                              <DialogTitle>Send {networkData.symbol}</DialogTitle>
+                              <DialogTitle>Transfer RMCoins</DialogTitle>
                               <DialogDescription>
-                                Enter the recipient's address and amount to send
+                                Enter the amount to transfer
                               </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4 py-4">
                               <div className="space-y-2">
-                                <label className="text-sm font-medium">Recipient Address</label>
-                                <Input 
-                                  placeholder="0x..." 
-                                  value={sendAddress}
-                                  onChange={(e) => setSendAddress(e.target.value)}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium">Amount ({networkData.symbol})</label>
+                                <label className="text-sm font-medium">Amount (RMCoins)</label>
                                 <Input 
                                   type="number"
                                   placeholder="0.00" 
@@ -245,7 +290,7 @@ const WalletPage = () => {
                                   onChange={(e) => setSendAmount(e.target.value)}
                                 />
                                 <div className="text-xs text-gray-400 flex justify-between">
-                                  <span>Available: {balance} {networkData.symbol}</span>
+                                  <span>Available: {balance} RMCoins</span>
                                   <button 
                                     className="text-neon-blue"
                                     onClick={() => setSendAmount(balance)}
@@ -254,20 +299,11 @@ const WalletPage = () => {
                                   </button>
                                 </div>
                               </div>
-                              <div className="p-3 bg-amber-500/10 rounded-md">
-                                <div className="flex items-center text-amber-400 text-xs gap-2">
-                                  <AlertTriangle className="h-4 w-4" />
-                                  <span>This will trigger a real blockchain transaction</span>
-                                </div>
-                              </div>
                             </div>
                             <DialogFooter>
                               <Button 
                                 variant="outline" 
-                                onClick={() => {
-                                  setSendAmount("");
-                                  setSendAddress("");
-                                }}
+                                onClick={() => setSendAmount("")}
                               >
                                 Cancel
                               </Button>
@@ -275,53 +311,15 @@ const WalletPage = () => {
                                 onClick={handleSendTransaction}
                                 disabled={isLoading}
                               >
-                                {isLoading ? "Processing..." : "Send"}
+                                {isLoading ? "Processing..." : "Transfer"}
                               </Button>
                             </DialogFooter>
                           </DialogContent>
                         </Dialog>
-                        
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button className="w-full bg-neon-purple hover:bg-neon-purple/90">
-                              <Download className="h-4 w-4 mr-2" />
-                              Receive
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="glass-panel border-white/10">
-                            <DialogHeader>
-                              <DialogTitle>Receive {networkData.symbol}</DialogTitle>
-                              <DialogDescription>
-                                Share your wallet address with the sender
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="bg-white/5 p-4 rounded-md">
-                                <div className="mb-2 text-sm text-center">Your Wallet Address</div>
-                                <div className="bg-white/10 p-3 rounded-md break-all text-center text-xs">
-                                  {currentAddress}
-                                </div>
-                              </div>
-                              <div className="flex justify-center">
-                                <div className="bg-white p-4 rounded-md w-40 h-40 flex items-center justify-center">
-                                  <div className="text-black text-xs text-center">
-                                    {/* In a production app, we'd generate an actual QR code here */}
-                                    QR Code for: {currentAddress.substring(0, 10)}...
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button 
-                                onClick={() => copyToClipboard(currentAddress)}
-                                className="w-full"
-                              >
-                                <Copy className="h-4 w-4 mr-2" />
-                                Copy Address
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
+
+                        <Button className="w-full bg-neon-green hover:bg-neon-green/90">
+                          Play to Earn
+                        </Button>
                       </div>
 
                       <Button 
@@ -371,7 +369,7 @@ const WalletPage = () => {
                             address={tx.address}
                             timestamp={tx.timestamp}
                             hash={tx.hash}
-                            networkUrl={networkData.explorerUrl}
+                            networkUrl={'#'}
                           />
                         ))}
                       </div>
@@ -379,15 +377,9 @@ const WalletPage = () => {
                       <div className="text-center py-8">
                         <div className="text-gray-400">No transactions found</div>
                         <p className="text-sm text-gray-500 mt-2">
-                          Transactions will appear here once you send or receive funds
+                          Transactions will appear here once you make transfers
                         </p>
                       </div>
-                    )}
-                    
-                    {filteredTransactions.length > 0 && (
-                      <Button variant="outline" className="w-full mt-4">
-                        View All in Explorer
-                      </Button>
                     )}
                   </CardContent>
                 </Card>
