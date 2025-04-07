@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Bell, Menu, Search, User, X } from "lucide-react";
+import { Bell, Menu, Search, User, X, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -45,6 +45,9 @@ const Navbar = () => {
             <Link to="/tournaments" className="navbar-item">
               Tournaments
             </Link>
+            <Link to="/wallet" className="navbar-item">
+              Wallet
+            </Link>
           </div>
 
           {/* User Actions */}
@@ -73,6 +76,19 @@ const Navbar = () => {
                     <TooltipContent>Search</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+
+                <Link to="/wallet">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="relative">
+                          <Wallet className="h-5 w-5 text-foreground/70 hover:text-neon-cyan" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Wallet</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Link>
 
                 <Link to="/profile">
                   <Avatar className="border-2 border-neon-blue/30 hover:border-neon-blue transition-colors">
@@ -116,6 +132,9 @@ const Navbar = () => {
             </Link>
             <Link to="/tournaments" className="navbar-item" onClick={() => setIsMenuOpen(false)}>
               Tournaments
+            </Link>
+            <Link to="/wallet" className="navbar-item" onClick={() => setIsMenuOpen(false)}>
+              <Wallet className="h-4 w-4 mr-2" /> Wallet
             </Link>
             
             {isLoggedIn ? (

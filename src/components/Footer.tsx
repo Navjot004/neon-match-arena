@@ -1,5 +1,6 @@
+
 import { Link } from "react-router-dom";
-import { Github, Twitter, MessagesSquare, Heart } from "lucide-react";
+import { Github, Twitter, MessagesSquare, Heart, Wallet } from "lucide-react";
 
 const Footer = () => {
   return (
@@ -37,6 +38,7 @@ const Footer = () => {
               <li><Link to="/matchmaking" className="text-gray-400 hover:text-neon-blue transition-colors">Matchmaking</Link></li>
               <li><Link to="/rooms" className="text-gray-400 hover:text-neon-blue transition-colors">Game Rooms</Link></li>
               <li><Link to="/tournaments" className="text-gray-400 hover:text-neon-blue transition-colors">Tournaments</Link></li>
+              <li><Link to="/wallet" className="text-gray-400 hover:text-neon-blue transition-colors">Wallet</Link></li>
             </ul>
           </div>
           
