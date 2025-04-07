@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from "react";
 import { 
-  WalletIcon, ArrowRightLeft, RefreshCw, Clock, Download, Upload, Copy, ExternalLink, AlertTriangle
+  WalletIcon, ArrowRightLeft, RefreshCw, Clock, Download, Upload, Copy, ExternalLink, AlertTriangle, Award
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +20,7 @@ import { toast } from "@/components/ui/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import TransactionItem from "@/components/TransactionItem";
-import { createWallet, getBalance, transferFunds, getTransactions, Transaction as ApiTransaction } from "@/services/walletApi";
+import { createWallet, getBalance, transferFunds, getTransactions, earnCoins, Transaction as ApiTransaction } from "@/services/walletApi";
 import { Transaction } from "@/types/blockchain";
 
 const WalletPage = () => {
@@ -35,7 +34,6 @@ const WalletPage = () => {
   const [transactionFilter, setTransactionFilter] = useState("all");
 
   useEffect(() => {
-    // Check if wallet already exists in localStorage
     const savedWalletId = localStorage.getItem("walletId");
     if (savedWalletId) {
       setWalletId(savedWalletId);
@@ -53,7 +51,6 @@ const WalletPage = () => {
       setBalance(response.balance.toString());
       setIsConnected(true);
       
-      // Save to localStorage
       localStorage.setItem("walletId", response.wallet_id);
       
       toast({
@@ -78,7 +75,6 @@ const WalletPage = () => {
     setIsConnected(false);
     setTransactions([]);
     
-    // Remove from localStorage
     localStorage.removeItem("walletId");
     
     toast({
@@ -104,7 +100,6 @@ const WalletPage = () => {
     try {
       const apiTransactions = await getTransactions(id);
       
-      // Convert API transactions to our internal format
       const formattedTransactions: Transaction[] = apiTransactions.map((tx: ApiTransaction) => ({
         id: tx.id,
         type: tx.type === 'credit' ? 'receive' : 'send',
@@ -134,10 +129,8 @@ const WalletPage = () => {
     try {
       const result = await transferFunds(walletId, parseFloat(sendAmount));
       
-      // Update balance
       setBalance(result.new_balance.toString());
       
-      // Add to local transaction history
       const newTx: Transaction = {
         id: result.txn.id,
         type: 'send',
@@ -160,6 +153,42 @@ const WalletPage = () => {
         variant: "destructive",
         title: "Transaction failed",
         description: error.response?.data?.error || "Failed to send transaction",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEarnCoins = async () => {
+    if (!walletId) return;
+    
+    setIsLoading(true);
+    try {
+      const result = await earnCoins(walletId);
+      
+      setBalance(result.new_balance.toString());
+      
+      const newTx: Transaction = {
+        id: result.txn.id,
+        type: 'receive',
+        amount: result.txn.amount.toString(),
+        address: 'Game Rewards',
+        timestamp: new Date(result.txn.timestamp * 1000).toLocaleString(),
+        hash: result.txn.id
+      };
+      
+      setTransactions(prev => [newTx, ...prev]);
+      
+      toast({
+        title: "Coins earned!",
+        description: `You've earned ${result.amount} RMCoins from playing`,
+      });
+    } catch (error: any) {
+      console.error("Error earning coins:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to earn coins",
+        description: error.message || "An unknown error occurred",
       });
     } finally {
       setIsLoading(false);
@@ -216,7 +245,6 @@ const WalletPage = () => {
             </Card>
           ) : (
             <div className="flex flex-col md:flex-row gap-8">
-              {/* Wallet Card */}
               <div className="w-full md:w-1/3">
                 <Card className="glass-panel h-full">
                   <CardHeader className="border-b border-white/10 pb-6">
@@ -317,8 +345,13 @@ const WalletPage = () => {
                           </DialogContent>
                         </Dialog>
 
-                        <Button className="w-full bg-neon-green hover:bg-neon-green/90">
-                          Play to Earn
+                        <Button 
+                          className="w-full bg-neon-green hover:bg-neon-green/90"
+                          onClick={handleEarnCoins}
+                          disabled={isLoading}
+                        >
+                          <Award className="h-4 w-4 mr-2" />
+                          {isLoading ? "Playing..." : "Play to Earn"}
                         </Button>
                       </div>
 
@@ -334,7 +367,6 @@ const WalletPage = () => {
                 </Card>
               </div>
               
-              {/* Transaction History */}
               <div className="w-full md:w-2/3">
                 <Card className="glass-panel h-full">
                   <CardHeader className="border-b border-white/10 pb-6">
