@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import Web3 from 'web3';
 import { toast } from "@/components/ui/use-toast";
+import { Ethereum, EthereumEventHandler } from '@/types/ethereum';
 
 interface BlockchainContextType {
   web3: Web3 | null;
@@ -30,6 +31,10 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
       try {
         if (window.ethereum) {
           // Subscribe to accounts change
+          const handleAccountsChanged: EthereumEventHandler<'accountsChanged'> = (newAccounts) => {
+            handleAccountsChangedCallback(newAccounts);
+          };
+          
           window.ethereum.on('accountsChanged', handleAccountsChanged);
           
           // Subscribe to chainId change
@@ -38,13 +43,14 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
           });
 
           // Check if already connected
-          const web3Instance = new Web3(window.ethereum);
+          // Fix: Create Web3 instance with provider type cast
+          const web3Instance = new Web3(window.ethereum as any);
           setWeb3(web3Instance);
 
           // Check if already authorized
           const accounts = await web3Instance.eth.getAccounts();
           if (accounts.length > 0) {
-            handleAccountsChanged(accounts);
+            handleAccountsChangedCallback(accounts);
           }
         }
       } catch (error) {
@@ -57,12 +63,16 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
     // Cleanup
     return () => {
       if (window.ethereum) {
+        // Need to use the same function reference for removal
+        const handleAccountsChanged: EthereumEventHandler<'accountsChanged'> = (newAccounts) => {
+          handleAccountsChangedCallback(newAccounts);
+        };
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       }
     };
   }, []);
 
-  const handleAccountsChanged = async (newAccounts: string[]) => {
+  const handleAccountsChangedCallback = (newAccounts: string[]) => {
     if (newAccounts.length === 0) {
       // User disconnected their wallet
       setAccounts([]);
@@ -76,9 +86,8 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
 
     if (web3) {
       try {
-        const balance = await web3.eth.getBalance(newAccounts[0]);
-        const etherBalance = web3.utils.fromWei(balance, 'ether');
-        setBalance(parseFloat(etherBalance).toFixed(4));
+        // Get balance for the first account
+        refreshBalance();
       } catch (error) {
         console.error("Error getting balance:", error);
       }
@@ -98,11 +107,12 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
         return;
       }
 
+      // Fix: Cast the result to string[] because we expect an array of addresses
       const accounts = await window.ethereum.request({ 
         method: 'eth_requestAccounts' 
-      });
+      }) as string[];
       
-      handleAccountsChanged(accounts);
+      handleAccountsChangedCallback(accounts);
       
       toast({
         title: "Wallet connected",
@@ -156,14 +166,15 @@ export const BlockchainProvider: React.FC<{ children: ReactNode }> = ({ children
     try {
       const weiAmount = web3.utils.toWei(amount, 'ether');
       
-      const tx = await window.ethereum.request({
+      // Fix: Cast the result to string to ensure it has substring method
+      const tx = await window.ethereum!.request({
         method: 'eth_sendTransaction',
         params: [{
           from: accounts[0],
           to,
           value: web3.utils.toHex(weiAmount),
         }],
-      });
+      }) as string;
 
       toast({
         title: "Transaction submitted",
