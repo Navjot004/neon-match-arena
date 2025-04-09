@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Bell, Menu, Search, User, X, Wallet } from "lucide-react";
+import { Bell, BrainCircuit, Menu, Search, User, Wallet, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -47,6 +47,9 @@ const Navbar = () => {
             </Link>
             <Link to="/wallet" className="navbar-item">
               Wallet
+            </Link>
+            <Link to="/ai-analyse" className="navbar-item">
+              <BrainCircuit className="h-4 w-4 mr-1" /> AI Analyse
             </Link>
           </div>
 
@@ -135,6 +138,9 @@ const Navbar = () => {
             </Link>
             <Link to="/wallet" className="navbar-item" onClick={() => setIsMenuOpen(false)}>
               <Wallet className="h-4 w-4 mr-2" /> Wallet
+            </Link>
+            <Link to="/ai-analyse" className="navbar-item" onClick={() => setIsMenuOpen(false)}>
+              <BrainCircuit className="h-4 w-4 mr-2" /> AI Analyse
             </Link>
             
             {isLoggedIn ? (
