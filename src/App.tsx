@@ -15,6 +15,7 @@ import Tournaments from "./pages/Tournaments";
 import WalletPage from "./pages/Wallet";
 import AIAnalyse from "./pages/AIAnalyse";
 import NotFound from "./pages/NotFound";
+import TutorialButtons from "./components/TutorialButtons";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <TutorialButtons />
         </BrowserRouter>
       </TooltipProvider>
     </BlockchainProvider>
